@@ -1,0 +1,45 @@
+name: Deploy research blog to GitHub Pages
+
+env:
+  LANG: C.UTF-8
+  LC_ALL: C.UTF-8
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the complete Git history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Validate, build, and upload the static site
+        uses: withastro/action@v6
+        with:
+          node-version: 24
+          package-manager: pnpm@11.9.0
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

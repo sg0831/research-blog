@@ -1,0 +1,42 @@
+---
+import { siteConfig, type Language } from '../config/site';
+import { t } from '../lib/i18n';
+import { localizedPath, withBase } from '../lib/urls';
+
+interface Props { lang: Language }
+const { lang } = Astro.props;
+const text = t(lang);
+---
+
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href={localizedPath(lang)} aria-label={`${siteConfig.title[lang]} · ${text.home}`}>
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span>{siteConfig.title[lang]}</span>
+    </a>
+    <nav class="header-actions" aria-label={lang === 'ko' ? '주요 메뉴' : 'Main navigation'}>
+      <a href={localizedPath(lang)}>{text.home}</a>
+      {import.meta.env.DEV && <a class="editor-link" href={withBase('editor/')}>{text.editor}</a>}
+      <a href={localizedPath(lang, 'rss.xml')} aria-label={`${text.rss} (${lang.toUpperCase()})`}>RSS</a>
+      <label class="language-control" for="language-select">
+        <span class="visually-hidden">{text.language}</span>
+        <select id="language-select" name="language" aria-label={text.language} data-home-en={localizedPath('en')} data-home-ko={localizedPath('ko')}>
+          <option value="en" selected={lang === 'en'}>English</option>
+          <option value="ko" selected={lang === 'ko'}>한국어</option>
+        </select>
+      </label>
+    </nav>
+  </div>
+</header>
+
+<script>
+  const select = document.querySelector<HTMLSelectElement>('#language-select');
+  select?.addEventListener('change', () => {
+    const nextLanguage = select.value === 'ko' ? 'ko' : 'en';
+    const replacedPath = window.location.pathname.replace(/\/(ko|en)(?=\/|$)/, `/${nextLanguage}`);
+    const nextPath = replacedPath === window.location.pathname
+      ? (nextLanguage === 'ko' ? select.dataset.homeKo : select.dataset.homeEn) ?? '/'
+      : replacedPath;
+    window.location.assign(`${nextPath}${window.location.search}${window.location.hash}`);
+  });
+</script>

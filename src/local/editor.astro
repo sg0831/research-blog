@@ -1,0 +1,728 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { withBase } from '../lib/urls';
+
+const apiBase = withBase('api/local');
+const publicKoBase = withBase('ko/posts');
+const publicEnBase = withBase('en/posts');
+---
+
+<BaseLayout lang="ko" title="로컬 글 작성기" description="로컬 개발 환경에서만 사용하는 Markdown 글 작성기입니다." noIndex>
+  <section class="editor-page" data-editor data-api-base={apiBase} data-public-ko={publicKoBase} data-public-en={publicEnBase} aria-busy="true">
+    <div class="container editor-heading">
+      <p class="eyebrow">LOCAL WORKSPACE ONLY</p>
+      <h1>글 작성기</h1>
+      <p>이 화면과 저장 기능은 로컬 개발 환경에서만 동작하며 GitHub Pages 빌드에는 포함되지 않습니다.</p>
+      <div class="local-notice" role="note">
+        <strong>작업 순서</strong>
+        <span>한글·영문 작성 → 미리보기 확인 → 파일 저장 → Git 커밋</span>
+      </div>
+    </div>
+
+    <div class="container editor-toolbar" aria-label="게시물 선택">
+      <label class="editor-field compact">
+        <span>기존 글 불러오기</span>
+        <select id="post-select" disabled><option value="">글 목록을 불러오는 중입니다</option></select>
+      </label>
+      <button type="button" class="button secondary" id="new-post">새 글</button>
+    </div>
+
+    <div class="container editor-grid">
+      <form class="editor-form" id="post-form">
+        <fieldset class="editor-section">
+          <legend>게시물 설정</legend>
+          <div class="editor-setting-grid">
+            <label class="editor-field">
+              <span>주소용 slug</span>
+              <input id="slug" name="slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="attention-paper-review" aria-describedby="slug-help" />
+              <small id="slug-help">영문 소문자, 숫자, 하이픈만 사용합니다. 기존 글의 slug는 변경할 수 없습니다.</small>
+            </label>
+            <label class="draft-toggle">
+              <input type="checkbox" id="draft" name="draft" checked />
+              <span>초안으로 저장</span>
+            </label>
+          </div>
+          <label class="editor-field">
+            <span>카테고리</span>
+            <select id="post-category" required disabled aria-describedby="category-template-help">
+              <option value="" disabled selected>카테고리를 불러오는 중입니다</option>
+            </select>
+            <small id="category-template-help">새 글에서 카테고리를 선택하면 해당 한국어·영어 Markdown 양식을 불러옵니다.</small>
+          </label>
+          <div class="editor-tags tag-picker" data-editor-tag-picker>
+            <label class="editor-field" for="editor-tag-input">
+              <span>태그</span>
+              <input
+                id="editor-tag-input"
+                type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="editor-tag-suggestions"
+                aria-describedby="editor-tag-help"
+                autocomplete="off"
+                placeholder="태그를 입력하거나 목록에서 선택하세요"
+                data-tag-input
+                disabled
+              />
+              <small id="editor-tag-help">기존 태그를 선택하거나, 새 태그를 입력한 뒤 Enter를 눌러 만들 수 있습니다.</small>
+            </label>
+            <ul id="editor-tag-suggestions" class="tag-suggestions" role="listbox" hidden data-tag-listbox></ul>
+            <ul class="selected-tag-list" aria-label="선택한 태그" data-selected-tags></ul>
+            <p class="visually-hidden" role="status" aria-live="polite" data-tag-live></p>
+          </div>
+        </fieldset>
+
+        <fieldset class="editor-section language-section" lang="ko">
+          <legend>한국어 글</legend>
+          <label class="editor-field"><span>한국어 제목</span><input id="title-ko" required /></label>
+          <label class="editor-field"><span>한국어 요약</span><textarea id="summary-ko" rows="3" required></textarea></label>
+          <label class="editor-field"><span>한국어 Markdown 본문</span><textarea id="body-ko" class="markdown-input" rows="22" required spellcheck="true"></textarea></label>
+        </fieldset>
+
+        <fieldset class="editor-section language-section" lang="en">
+          <legend>English post</legend>
+          <label class="editor-field"><span>English title</span><input id="title-en" required /></label>
+          <label class="editor-field"><span>English summary</span><textarea id="summary-en" rows="3" required></textarea></label>
+          <label class="editor-field"><span>English Markdown body</span><textarea id="body-en" class="markdown-input" rows="22" required spellcheck="true"></textarea></label>
+        </fieldset>
+
+        <fieldset class="editor-section image-section">
+          <legend>이미지</legend>
+          <label class="editor-field">
+            <span>추가할 이미지 선택</span>
+            <input type="file" id="images" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,image/svg+xml" multiple />
+            <small>파일당 최대 10MB입니다. 본문에는 <code>![대체 텍스트](./images/file-name.png)</code> 형식으로 삽입됩니다.</small>
+          </label>
+          <ul id="image-list" class="editor-image-list" aria-label="선택하거나 저장된 이미지"></ul>
+        </fieldset>
+
+        <div class="editor-actions">
+          <button type="button" class="button secondary" id="preview-button">미리보기 확인</button>
+          <button type="submit" class="button primary" id="save-button" disabled>Markdown 파일 저장</button>
+        </div>
+        <p class="editor-status" id="editor-status" role="status" aria-live="polite" tabindex="-1">카테고리와 글 목록을 불러오고 있습니다.</p>
+      </form>
+
+      <aside class="preview-panel" aria-labelledby="preview-heading">
+        <div class="preview-toolbar">
+          <h2 id="preview-heading">최종 글 미리보기</h2>
+          <label class="editor-field compact">
+            <span>미리볼 언어</span>
+            <select id="preview-language">
+              <option value="ko">한국어</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+        <div class="preview-paper" id="preview-paper">
+          <p class="preview-empty">미리보기 버튼을 누르면 실제 공개 글과 같은 스타일로 표시됩니다.</p>
+        </div>
+      </aside>
+    </div>
+
+    <div class="container category-manager-wrap">
+      <details class="category-manager">
+        <summary>카테고리 추가·수정·삭제</summary>
+        <p>사용 중인 카테고리는 해당 글에서 먼저 제외해야 삭제할 수 있습니다.</p>
+        <div class="category-manager-grid">
+          <form id="category-form" class="category-form">
+            <input type="hidden" id="category-editing-id" />
+            <label class="editor-field"><span>카테고리 ID</span><input id="category-id" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" placeholder="research-methods" /></label>
+            <label class="editor-field"><span>한국어 이름</span><input id="category-ko" required /></label>
+            <label class="editor-field"><span>English name</span><input id="category-en" required /></label>
+            <label class="editor-field"><span>한국어 설명</span><textarea id="category-description-ko" rows="2"></textarea></label>
+            <label class="editor-field"><span>English description</span><textarea id="category-description-en" rows="2"></textarea></label>
+            <div class="button-row">
+              <button class="button primary" type="submit">카테고리 저장</button>
+              <button class="button quiet" type="button" id="category-cancel">입력 초기화</button>
+            </div>
+          </form>
+          <div>
+            <h3>현재 카테고리</h3>
+            <ul id="category-list" class="category-editor-list" aria-label="현재 카테고리" aria-live="polite"></ul>
+          </div>
+        </div>
+        <p class="editor-status" id="category-status" role="status" aria-live="polite"></p>
+      </details>
+    </div>
+
+    <div class="container category-manager-wrap">
+      <details class="category-manager">
+        <summary>태그 추가·수정·삭제</summary>
+        <p>태그는 한영 구분 없이 하나의 고유 키워드로 사용합니다. 사용 중인 태그는 먼저 게시물에서 제외해야 변경하거나 삭제할 수 있습니다.</p>
+        <div class="category-manager-grid">
+          <form id="tag-form" class="category-form">
+            <input type="hidden" id="tag-editing-id" />
+            <label class="editor-field">
+              <span>태그 키워드</span>
+              <input id="tag-id" required maxlength="50" placeholder="machine-learning" aria-describedby="tag-format-help" />
+              <small id="tag-format-help">글자·숫자와 단어 사이의 하이픈을 사용할 수 있으며 영문은 소문자로 저장됩니다.</small>
+            </label>
+            <div class="button-row">
+              <button class="button primary" type="submit">태그 저장</button>
+              <button class="button quiet" type="button" id="tag-cancel">입력 초기화</button>
+            </div>
+          </form>
+          <div>
+            <h3>현재 태그</h3>
+            <ul id="tag-list" class="category-editor-list"></ul>
+          </div>
+        </div>
+        <p class="editor-status" id="tag-status" role="status" aria-live="polite"></p>
+      </details>
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  import DOMPurify from 'dompurify';
+  import { renderMermaidBlocks } from '../scripts/mermaid';
+  import { createTagPicker, type TagPickerController } from '../scripts/tag-picker';
+  import { normalizeTag } from '../lib/tags';
+
+  interface Category {
+    id: string;
+    ko: string;
+    en: string;
+    descriptionKo: string;
+    descriptionEn: string;
+    template?: string;
+  }
+  interface PostPayload {
+    slug: string;
+    draft: boolean;
+    category: string;
+    tags: string[];
+    ko: { title: string; summary: string; body: string };
+    en: { title: string; summary: string; body: string };
+  }
+
+  const root = document.querySelector<HTMLElement>('[data-editor]')!;
+  const api = root.dataset.apiBase!;
+  const form = document.querySelector<HTMLFormElement>('#post-form')!;
+  const postSelect = document.querySelector<HTMLSelectElement>('#post-select')!;
+  const slugInput = document.querySelector<HTMLInputElement>('#slug')!;
+  const saveButton = document.querySelector<HTMLButtonElement>('#save-button')!;
+  const previewButton = document.querySelector<HTMLButtonElement>('#preview-button')!;
+  const previewLanguage = document.querySelector<HTMLSelectElement>('#preview-language')!;
+  const previewPaper = document.querySelector<HTMLElement>('#preview-paper')!;
+  const status = document.querySelector<HTMLElement>('#editor-status')!;
+  const imageInput = document.querySelector<HTMLInputElement>('#images')!;
+  const imageList = document.querySelector<HTMLUListElement>('#image-list')!;
+  const categorySelect = document.querySelector<HTMLSelectElement>('#post-category')!;
+  const tagPickerRoot = document.querySelector<HTMLElement>('[data-editor-tag-picker]')!;
+  let categories: Category[] = [];
+  let categoryUsage: Record<string, string[]> = {};
+  let tags: string[] = [];
+  let tagUsage: Record<string, string[]> = {};
+  let tagPicker: TagPickerController;
+  let existingImages: string[] = [];
+  let pendingFiles: File[] = [];
+  let lastPreviewFingerprint = '';
+  let previewObjectUrls: string[] = [];
+  let autosaveTimer = 0;
+
+  const field = (id: string) => document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!;
+  const setStatus = (message: string, error = false) => {
+    status.textContent = message;
+    status.classList.toggle('is-error', error);
+    status.focus({ preventScroll: true });
+  };
+  const apiUrl = (path: string) => `${api}/${path.replace(/^\/+|\/+$/g, '')}/`.replace(/\/{2,}/g, '/');
+  const fetchJson = async (url: string, options?: RequestInit) => {
+    const response = await fetch(url, options);
+    const contentType = response.headers.get('content-type') ?? '';
+    if (!contentType.includes('application/json')) {
+      throw new Error(`로컬 작성기 연결에 실패했습니다. 응답 코드: ${response.status}`);
+    }
+    const data = await response.json() as { error?: string; [key: string]: unknown };
+    if (!response.ok) throw new Error(data.error ?? `요청을 처리하지 못했습니다. 응답 코드: ${response.status}`);
+    return data;
+  };
+  const getPayload = (): PostPayload => ({
+    slug: slugInput.value.trim(),
+    draft: (document.querySelector<HTMLInputElement>('#draft')!).checked,
+    category: categorySelect.value,
+    tags: tagPicker?.getSelected() ?? [],
+    ko: { title: field('title-ko').value, summary: field('summary-ko').value, body: field('body-ko').value },
+    en: { title: field('title-en').value, summary: field('summary-en').value, body: field('body-en').value },
+  });
+  const fingerprint = () => JSON.stringify({ ...getPayload(), images: pendingFiles.map((file) => [file.name, file.size, file.lastModified]) });
+  const markDirty = () => {
+    saveButton.disabled = true;
+    lastPreviewFingerprint = '';
+    window.clearTimeout(autosaveTimer);
+    autosaveTimer = window.setTimeout(() => localStorage.setItem('researchEditorDraft', JSON.stringify(getPayload())), 350);
+  };
+
+  function renderCategoryChoices(selected = '') {
+    const first = document.createElement('option');
+    first.value = '';
+    first.textContent = '카테고리를 선택하세요';
+    categorySelect.replaceChildren(first, ...categories.map((category) => {
+      const option = document.createElement('option');
+      option.value = category.id;
+      option.textContent = `${category.ko} / ${category.en}`;
+      return option;
+    }));
+    categorySelect.value = categories.some((category) => category.id === selected) ? selected : '';
+  }
+
+  function renderImages() {
+    const all = [...existingImages.map((name) => ({ name, pending: false })), ...pendingFiles.map((file) => ({ name: file.name, pending: true }))];
+    imageList.replaceChildren(...all.map((image) => {
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      name.textContent = `${image.name}${image.pending ? ' (새 파일)' : ''}`;
+      const koButton = document.createElement('button');
+      koButton.type = 'button';
+      koButton.className = 'mini-button';
+      koButton.textContent = '한국어 본문에 삽입';
+      koButton.addEventListener('click', () => insertImage('ko', image.name));
+      const enButton = document.createElement('button');
+      enButton.type = 'button';
+      enButton.className = 'mini-button';
+      enButton.textContent = 'English body에 삽입';
+      enButton.addEventListener('click', () => insertImage('en', image.name));
+      item.append(name, koButton, enButton);
+      return item;
+    }));
+  }
+
+  function insertImage(lang: 'ko' | 'en', name: string) {
+    const alt = window.prompt(lang === 'ko' ? '이미지의 대체 텍스트를 입력하세요.' : 'Enter alternative text for the image.');
+    if (!alt?.trim()) {
+      setStatus('대체 텍스트가 없어 이미지를 삽입하지 않았습니다.', true);
+      return;
+    }
+    const textarea = field(`body-${lang}`) as HTMLTextAreaElement;
+    const markdown = `\n![${alt.trim()}](./images/${name})\n`;
+    textarea.setRangeText(markdown, textarea.selectionStart, textarea.selectionEnd, 'end');
+    textarea.focus();
+    markDirty();
+  }
+
+  async function loadCategories() {
+    const data = await fetchJson(apiUrl('categories'));
+    categories = data.categories as Category[];
+    categoryUsage = data.usage as Record<string, string[]>;
+    renderCategoryChoices(getPayload().category);
+    renderCategoryManager();
+    categorySelect.disabled = false;
+  }
+
+  async function persistTags(nextTags: string[]) {
+    const data = await fetchJson(apiUrl('tags'), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ tags: nextTags }),
+    });
+    tags = data.tags as string[];
+    tagUsage = data.usage as Record<string, string[]>;
+    tagPicker?.setAvailableTags(tags);
+    renderTagManager();
+    return data;
+  }
+
+  async function loadTags() {
+    const data = await fetchJson(apiUrl('tags'));
+    tags = data.tags as string[];
+    tagUsage = data.usage as Record<string, string[]>;
+    const tagInput = tagPickerRoot.querySelector<HTMLInputElement>('[data-tag-input]')!;
+    tagInput.disabled = false;
+    tagPicker = createTagPicker(tagPickerRoot, {
+      availableTags: tags,
+      allowCreate: true,
+      lang: 'ko',
+      onCreate: async (tag) => { await persistTags([...tags, tag]); },
+      onChange: markDirty,
+    });
+    renderTagManager();
+  }
+
+  async function loadPostList(selected = '') {
+    const data = await fetchJson(apiUrl('posts'));
+    const first = document.createElement('option');
+    first.value = '';
+    first.textContent = '글을 선택하세요';
+    const options = (data.posts as { slug: string; titleKo: string; draft: boolean }[]).map((post) => {
+      const option = document.createElement('option');
+      option.value = post.slug;
+      option.textContent = `${post.titleKo} (${post.slug})${post.draft ? ' · 초안' : ''}`;
+      option.selected = post.slug === selected;
+      return option;
+    });
+    postSelect.replaceChildren(first, ...options);
+    postSelect.disabled = false;
+  }
+
+  async function loadPost(slug: string) {
+    const post = await fetchJson(apiUrl(`post/${encodeURIComponent(slug)}`)) as unknown as PostPayload & { images: string[] };
+    slugInput.value = slug;
+    slugInput.readOnly = true;
+    (document.querySelector<HTMLInputElement>('#draft')!).checked = post.draft;
+    for (const lang of ['ko', 'en'] as const) {
+      field(`title-${lang}`).value = post[lang].title;
+      field(`summary-${lang}`).value = post[lang].summary;
+      field(`body-${lang}`).value = post[lang].body;
+    }
+    existingImages = post.images;
+    pendingFiles = [];
+    imageInput.value = '';
+    renderImages();
+    renderCategoryChoices(post.category);
+    tagPicker.setSelected(post.tags);
+    markDirty();
+    setStatus('글을 불러왔습니다. 변경 후 미리보기를 확인해야 파일을 저장할 수 있습니다.');
+  }
+
+  function resetPost() {
+    form.reset();
+    slugInput.readOnly = false;
+    existingImages = [];
+    pendingFiles = [];
+    postSelect.value = '';
+    renderImages();
+    renderCategoryChoices('');
+    tagPicker.setSelected([]);
+    previewPaper.innerHTML = '<p class="preview-empty">미리보기 버튼을 누르면 실제 공개 글과 같은 스타일로 표시됩니다.</p>';
+    markDirty();
+    setStatus('새 글 입력을 시작할 수 있습니다.');
+    slugInput.focus();
+  }
+
+  function rewritePreviewImages(container: HTMLElement, slug: string) {
+    previewObjectUrls.forEach(URL.revokeObjectURL);
+    previewObjectUrls = [];
+    const pending = new Map(pendingFiles.map((file) => [file.name, file]));
+    container.querySelectorAll<HTMLImageElement>('img').forEach((image) => {
+      const raw = image.getAttribute('src') ?? '';
+      const name = decodeURIComponent(raw.split('/').at(-1) ?? '');
+      const file = pending.get(name);
+      if (file) {
+        const objectUrl = URL.createObjectURL(file);
+        previewObjectUrls.push(objectUrl);
+        image.src = objectUrl;
+      } else if (existingImages.includes(name) && slug) {
+        image.src = apiUrl(`assets/${encodeURIComponent(slug)}/images/${encodeURIComponent(name)}`);
+      }
+    });
+  }
+
+  async function preview() {
+    const payload = getPayload();
+    const lang = previewLanguage.value === 'en' ? 'en' : 'ko';
+    if (!form.reportValidity()) return;
+    if (!payload.category) {
+      setStatus('카테고리를 선택하세요.', true);
+      categorySelect.focus();
+      return;
+    }
+    previewButton.disabled = true;
+    setStatus('미리보기를 만들고 있습니다.');
+    try {
+      const data = await fetchJson(apiUrl('preview'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ markdown: payload[lang].body, lang }),
+      });
+      const article = document.createElement('article');
+      article.className = 'preview-article';
+      article.lang = lang;
+      const header = document.createElement('header');
+      header.className = 'preview-post-header';
+      const title = document.createElement('h1');
+      title.textContent = payload[lang].title;
+      const summary = document.createElement('p');
+      summary.textContent = payload[lang].summary;
+      header.append(title, summary);
+      const content = document.createElement('div');
+      content.className = 'prose';
+      content.innerHTML = DOMPurify.sanitize(String(data.html ?? ''), { USE_PROFILES: { html: true } });
+      article.append(header, content);
+      previewPaper.replaceChildren(article);
+      rewritePreviewImages(content, payload.slug);
+      await renderMermaidBlocks(content, lang);
+      lastPreviewFingerprint = fingerprint();
+      saveButton.disabled = false;
+      setStatus(`${lang === 'ko' ? '한국어' : '영문'} 미리보기를 확인했습니다. 현재 내용은 파일에 저장할 수 있습니다.`);
+      previewPaper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '미리보기에 실패했습니다.', true);
+    } finally {
+      previewButton.disabled = false;
+    }
+  }
+
+  const toDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error(`${file.name} 파일을 읽을 수 없습니다.`));
+    reader.readAsDataURL(file);
+  });
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (lastPreviewFingerprint !== fingerprint()) {
+      saveButton.disabled = true;
+      setStatus('저장 전에 현재 내용을 다시 미리보기로 확인하세요.', true);
+      previewButton.focus();
+      return;
+    }
+    saveButton.disabled = true;
+    setStatus('Markdown 파일과 이미지를 저장하고 있습니다.');
+    try {
+      const images = await Promise.all(pendingFiles.map(async (file) => ({ name: file.name, data: await toDataUrl(file) })));
+      const payload = { ...getPayload(), images };
+      await fetchJson(apiUrl('posts'), { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify(payload) });
+      slugInput.readOnly = true;
+      existingImages = Array.from(new Set([...existingImages, ...pendingFiles.map((file) => file.name)]));
+      pendingFiles = [];
+      imageInput.value = '';
+      renderImages();
+      await loadPostList(payload.slug);
+      localStorage.removeItem('researchEditorDraft');
+      const koLink = `${root.dataset.publicKo}/${encodeURIComponent(payload.slug)}/`;
+      const enLink = `${root.dataset.publicEn}/${encodeURIComponent(payload.slug)}/`;
+      status.replaceChildren(
+        document.createTextNode('파일을 저장했습니다. 공개 페이지 형태도 확인한 뒤 Git에 커밋하세요. '),
+        Object.assign(document.createElement('a'), { href: koLink, textContent: '한국어 글 보기' }),
+        document.createTextNode(' · '),
+        Object.assign(document.createElement('a'), { href: enLink, textContent: 'English post 보기' }),
+      );
+      status.classList.remove('is-error');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '저장에 실패했습니다.', true);
+    }
+  });
+
+  form.addEventListener('input', (event) => {
+    if (event.target !== imageInput) markDirty();
+  });
+  form.addEventListener('change', (event) => {
+    if (event.target !== imageInput) markDirty();
+  });
+  imageInput.addEventListener('change', () => {
+    pendingFiles = Array.from(imageInput.files ?? []);
+    const invalid = pendingFiles.find((file) => file.size > 10 * 1024 * 1024);
+    if (invalid) setStatus(`${invalid.name}: 이미지 파일은 10MB 이하여야 합니다.`, true);
+    renderImages();
+    markDirty();
+  });
+  previewButton.addEventListener('click', () => { void preview(); });
+  previewLanguage.addEventListener('change', markDirty);
+  categorySelect.addEventListener('change', () => { void loadCategoryTemplate(categorySelect.value); });
+  postSelect.addEventListener('change', () => { if (postSelect.value) void loadPost(postSelect.value); });
+  document.querySelector('#new-post')?.addEventListener('click', resetPost);
+  document.addEventListener('keydown', (event) => {
+    if (event.ctrlKey && event.key === 'Enter') { event.preventDefault(); void preview(); }
+    if (event.ctrlKey && event.key.toLowerCase() === 's') { event.preventDefault(); form.requestSubmit(); }
+  });
+
+  async function loadCategoryTemplate(categoryId: string) {
+    if (!categoryId || slugInput.readOnly) return;
+    try {
+      const data = await fetchJson(apiUrl(`template/${encodeURIComponent(categoryId)}`)) as { template?: { ko: string; en: string } | null };
+      if (!data.template) return;
+      const hasBody = field('body-ko').value.trim() || field('body-en').value.trim();
+      if (hasBody && !window.confirm('현재 한국어·영어 본문을 선택한 카테고리 양식으로 바꿀까요?')) return;
+      field('body-ko').value = data.template.ko;
+      field('body-en').value = data.template.en;
+      markDirty();
+      setStatus('선택한 카테고리의 한국어·영어 Markdown 양식을 불러왔습니다. 자유롭게 수정하거나 삭제할 수 있습니다.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : '카테고리 양식을 불러오지 못했습니다.', true);
+    }
+  }
+
+  const categoryForm = document.querySelector<HTMLFormElement>('#category-form')!;
+  const categoryStatus = document.querySelector<HTMLElement>('#category-status')!;
+  const categoryList = document.querySelector<HTMLUListElement>('#category-list')!;
+  const categoryField = (id: string) => document.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!;
+  function resetCategoryForm() {
+    categoryForm.reset();
+    categoryField('category-editing-id').value = '';
+    (categoryField('category-id') as HTMLInputElement).readOnly = false;
+  }
+  function renderCategoryManager() {
+    categoryList.replaceChildren(...categories.map((category) => {
+      const item = document.createElement('li');
+      const copy = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `${category.ko} / ${category.en}`;
+      const meta = document.createElement('small');
+      meta.textContent = `${category.id} · 사용 글 ${categoryUsage[category.id]?.length ?? 0}개`;
+      copy.append(title, meta);
+      const actions = document.createElement('div');
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'mini-button';
+      edit.textContent = '수정';
+      edit.addEventListener('click', () => {
+        categoryField('category-editing-id').value = category.id;
+        categoryField('category-id').value = category.id;
+        (categoryField('category-id') as HTMLInputElement).readOnly = true;
+        categoryField('category-ko').value = category.ko;
+        categoryField('category-en').value = category.en;
+        categoryField('category-description-ko').value = category.descriptionKo;
+        categoryField('category-description-en').value = category.descriptionEn;
+        categoryField('category-ko').focus();
+      });
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'mini-button danger';
+      remove.textContent = '삭제';
+      remove.addEventListener('click', async () => {
+        if (!window.confirm(`'${category.ko}' 카테고리를 삭제할까요?`)) return;
+        try {
+          await saveCategories(categories.filter((item) => item.id !== category.id));
+        } catch (error) {
+          categoryStatus.textContent = error instanceof Error ? error.message : '삭제하지 못했습니다.';
+          categoryStatus.classList.add('is-error');
+        }
+      });
+      actions.append(edit, remove);
+      item.append(copy, actions);
+      return item;
+    }));
+  }
+  async function saveCategories(nextCategories: Category[]) {
+    const data = await fetchJson(apiUrl('categories'), {
+      method: 'PUT', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ categories: nextCategories }),
+    });
+    categories = data.categories as Category[];
+    categoryUsage = data.usage as Record<string, string[]>;
+    renderCategoryChoices(categories.some((category) => category.id === getPayload().category) ? getPayload().category : '');
+    renderCategoryManager();
+    resetCategoryForm();
+    categoryStatus.textContent = '카테고리를 저장했습니다.';
+    categoryStatus.classList.remove('is-error');
+    markDirty();
+  }
+  categoryForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const id = categoryField('category-id').value.trim();
+    const category: Category = {
+      id,
+      ko: categoryField('category-ko').value.trim(),
+      en: categoryField('category-en').value.trim(),
+      descriptionKo: categoryField('category-description-ko').value.trim(),
+      descriptionEn: categoryField('category-description-en').value.trim(),
+      template: categories.find((item) => item.id === categoryField('category-editing-id').value)?.template,
+    };
+    const editingId = categoryField('category-editing-id').value;
+    const next = editingId ? categories.map((item) => item.id === editingId ? category : item) : [...categories, category];
+    try { await saveCategories(next); }
+    catch (error) {
+      categoryStatus.textContent = error instanceof Error ? error.message : '카테고리를 저장하지 못했습니다.';
+      categoryStatus.classList.add('is-error');
+    }
+  });
+  document.querySelector('#category-cancel')?.addEventListener('click', resetCategoryForm);
+
+  const tagForm = document.querySelector<HTMLFormElement>('#tag-form')!;
+  const tagStatus = document.querySelector<HTMLElement>('#tag-status')!;
+  const tagList = document.querySelector<HTMLUListElement>('#tag-list')!;
+  const tagId = document.querySelector<HTMLInputElement>('#tag-id')!;
+  const tagEditingId = document.querySelector<HTMLInputElement>('#tag-editing-id')!;
+  function resetTagForm() {
+    tagForm.reset();
+    tagEditingId.value = '';
+    tagId.readOnly = false;
+  }
+  function renderTagManager() {
+    if (tags.length === 0) {
+      const empty = document.createElement('li');
+      empty.textContent = '아직 등록된 태그가 없습니다.';
+      tagList.replaceChildren(empty);
+      return;
+    }
+    tagList.replaceChildren(...tags.map((tag) => {
+      const item = document.createElement('li');
+      const copy = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = `#${tag}`;
+      const meta = document.createElement('small');
+      meta.textContent = `사용 글 ${tagUsage[tag]?.length ?? 0}개`;
+      copy.append(title, meta);
+      const actions = document.createElement('div');
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.className = 'mini-button';
+      edit.textContent = '수정';
+      edit.addEventListener('click', () => {
+        tagEditingId.value = tag;
+        tagId.value = tag;
+        tagId.focus();
+      });
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'mini-button danger';
+      remove.textContent = '삭제';
+      remove.addEventListener('click', async () => {
+        if (!window.confirm(`#${tag} 태그를 삭제할까요?`)) return;
+        try {
+          await persistTags(tags.filter((item) => item !== tag));
+          tagPicker.setSelected(tagPicker.getSelected().filter((item) => item !== tag));
+          tagStatus.textContent = '태그를 삭제했습니다.';
+          tagStatus.classList.remove('is-error');
+          markDirty();
+        } catch (error) {
+          tagStatus.textContent = error instanceof Error ? error.message : '태그를 삭제하지 못했습니다.';
+          tagStatus.classList.add('is-error');
+        }
+      });
+      actions.append(edit, remove);
+      item.append(copy, actions);
+      return item;
+    }));
+  }
+  tagForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const value = normalizeTag(tagId.value);
+    const editing = tagEditingId.value;
+    const next = editing ? tags.map((tag) => tag === editing ? value : tag) : [...tags, value];
+    try {
+      const selected = tagPicker.getSelected().map((tag) => tag === editing ? value : tag);
+      await persistTags(next);
+      tagPicker.setSelected(selected);
+      resetTagForm();
+      tagStatus.textContent = '태그를 저장했습니다.';
+      tagStatus.classList.remove('is-error');
+      markDirty();
+    } catch (error) {
+      tagStatus.textContent = error instanceof Error ? error.message : '태그를 저장하지 못했습니다.';
+      tagStatus.classList.add('is-error');
+    }
+  });
+  document.querySelector('#tag-cancel')?.addEventListener('click', resetTagForm);
+
+  Promise.all([loadCategories(), loadTags(), loadPostList()]).then(() => {
+    const saved = localStorage.getItem('researchEditorDraft');
+    if (!saved) {
+      setStatus('새 글을 작성하거나 기존 글을 불러오세요.');
+      return;
+    }
+    try {
+      const draft = JSON.parse(saved) as PostPayload;
+      if (!draft.slug && !draft.ko.title && !draft.en.title && !draft.ko.body && !draft.en.body) {
+        localStorage.removeItem('researchEditorDraft');
+        setStatus('새 글을 작성하거나 기존 글을 불러오세요.');
+        return;
+      }
+      slugInput.value = draft.slug;
+      (document.querySelector<HTMLInputElement>('#draft')!).checked = draft.draft;
+      for (const lang of ['ko', 'en'] as const) {
+        field(`title-${lang}`).value = draft[lang].title;
+        field(`summary-${lang}`).value = draft[lang].summary;
+        field(`body-${lang}`).value = draft[lang].body;
+      }
+      renderCategoryChoices(draft.category);
+      tagPicker.setSelected(draft.tags ?? []);
+      setStatus('브라우저에 임시 저장된 작성 내용을 복구했습니다. 파일 저장 전 미리보기를 확인하세요.');
+    } catch {
+      localStorage.removeItem('researchEditorDraft');
+      setStatus('임시 저장 내용을 읽을 수 없어 비웠습니다. 새 글을 작성하거나 기존 글을 불러오세요.', true);
+    }
+  }).catch((error) => setStatus(error instanceof Error ? error.message : '에디터 초기화에 실패했습니다.', true))
+    .finally(() => root.setAttribute('aria-busy', 'false'));
+</script>

@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t } from '../lib/i18n';
+import { localizedPath } from '../lib/urls';
+const text = t('en');
+---
+
+<BaseLayout lang="en" title={text.notFoundTitle} noIndex>
+  <section class="not-found container">
+    <p class="eyebrow">404</p>
+    <h1>{text.notFoundTitle}</h1>
+    <p>{text.notFoundBody}</p>
+    <p lang="ko">요청한 페이지를 찾을 수 없습니다.</p>
+    <div class="button-row">
+      <a class="button primary" href={localizedPath('en')}>Go to English home</a>
+      <a class="button secondary" href={localizedPath('ko')} lang="ko">한국어 홈으로 이동</a>
+    </div>
+  </section>
+</BaseLayout>

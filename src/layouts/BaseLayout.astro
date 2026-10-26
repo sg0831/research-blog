@@ -1,0 +1,101 @@
+---
+import 'katex/dist/katex.min.css';
+import '../styles/global.css';
+import SiteHeader from '../components/SiteHeader.astro';
+import { siteConfig, type Language } from '../config/site';
+import { t } from '../lib/i18n';
+
+interface Props {
+  lang: Language;
+  title?: string;
+  description?: string;
+  noIndex?: boolean;
+  article?: boolean;
+}
+
+const {
+  lang,
+  title = siteConfig.title[lang],
+  description = siteConfig.description[lang],
+  noIndex = false,
+  article = false,
+} = Astro.props;
+const text = t(lang);
+const pageTitle = title === siteConfig.title[lang] ? title : `${title} · ${siteConfig.title[lang]}`;
+const canonical = new URL(Astro.url.pathname, Astro.site ?? Astro.url.origin);
+const koAlternate = new URL(Astro.url.pathname.replace(/\/(en|ko)(?=\/|$)/, '/ko'), canonical);
+const enAlternate = new URL(Astro.url.pathname.replace(/\/(en|ko)(?=\/|$)/, '/en'), canonical);
+const socialImage = article ? null : new URL(`${import.meta.env.BASE_URL}og.png`, Astro.site ?? Astro.url.origin);
+---
+
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta name="theme-color" content="#f9fbf6" />
+    {noIndex && <meta name="robots" content="noindex, nofollow" />}
+    <link rel="canonical" href={canonical} />
+    <link rel="alternate" hreflang="ko" href={koAlternate} />
+    <link rel="alternate" hreflang="en" href={enAlternate} />
+    <link rel="alternate" hreflang="x-default" href={enAlternate} />
+    <meta property="og:type" content={article ? 'article' : 'website'} />
+    <meta property="og:locale" content={lang === 'ko' ? 'ko_KR' : 'en_US'} />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    {socialImage && <meta property="og:image" content={socialImage} />}
+    {socialImage && <meta property="og:image:width" content="1715" />}
+    {socialImage && <meta property="og:image:height" content="907" />}
+    {socialImage && <meta
+      property="og:image:alt"
+      content={lang === 'ko' ? '연구 노트와 상승 그래프가 그려진 열린 연구노트 소개 이미지' : 'Open Research Notes card with a research notebook and rising chart'}
+    />}
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={pageTitle} />
+    <meta name="twitter:description" content={description} />
+    {socialImage && <meta name="twitter:image" content={socialImage} />}
+    {socialImage && <meta
+      name="twitter:image:alt"
+      content={lang === 'ko' ? '연구 노트와 상승 그래프가 그려진 열린 연구노트 소개 이미지' : 'Open Research Notes card with a research notebook and rising chart'}
+    />}
+    <title>{pageTitle}</title>
+    <script is:inline>
+      document.addEventListener('error', (event) => {
+        const image = event.target;
+        if (!(image instanceof HTMLImageElement) || image.dataset.errorHandled === 'true') return;
+        image.dataset.errorHandled = 'true';
+        const lang = document.documentElement.lang === 'ko' ? 'ko' : 'en';
+        const path = image.getAttribute('src') || '';
+        const alt = image.getAttribute('alt') || '';
+        const message = lang === 'ko'
+          ? `이미지를 불러올 수 없습니다. 경로: ${path}. 대체 텍스트: ${alt || '없음'}`
+          : `Image unavailable. Path: ${path}. Alternative text: ${alt || 'missing'}`;
+        const notice = document.createElement('p');
+        notice.className = 'image-error';
+        notice.setAttribute('role', 'alert');
+        notice.setAttribute('aria-label', message);
+        notice.textContent = message;
+        image.hidden = true;
+        image.insertAdjacentElement('afterend', notice);
+      }, true);
+    </script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">{text.skip}</a>
+    <div class="page-shell">
+      <SiteHeader lang={lang} />
+      <main id="main-content" tabindex="-1">
+        <slot />
+      </main>
+      <footer class="site-footer">
+        <div class="container footer-inner">
+          <p><strong>{siteConfig.title[lang]}</strong> · {text.footer}</p>
+          <p>© {new Date().getFullYear()} {siteConfig.author}</p>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

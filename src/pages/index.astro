@@ -1,0 +1,33 @@
+---
+import '../styles/global.css';
+import { defaultLanguage, siteConfig } from '../config/site';
+import { withBase } from '../lib/urls';
+
+const englishUrl = withBase('en/');
+const koreanUrl = withBase('ko/');
+---
+
+<!doctype html>
+<html lang="en" data-default-language={defaultLanguage}>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, follow" />
+    <meta name="description" content={siteConfig.description.en} />
+    <title>{siteConfig.title.en}</title>
+    <script is:inline define:vars={{ defaultLanguage, englishUrl, koreanUrl }}>
+      window.location.replace(defaultLanguage === 'ko' ? koreanUrl : englishUrl);
+    </script>
+  </head>
+  <body class="language-landing">
+    <main id="main-content" class="language-card">
+      <p class="eyebrow">READ · QUESTION · CONNECT</p>
+      <h1>{siteConfig.title.en}</h1>
+      <p>{siteConfig.description.en}</p>
+      <nav aria-label="Choose language / 언어 선택">
+        <a class="button primary" href={englishUrl}>Continue in English</a>
+        <a class="button secondary" href={koreanUrl} lang="ko">한국어로 계속하기</a>
+      </nav>
+    </main>
+  </body>
+</html>

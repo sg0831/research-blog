@@ -1,0 +1,82 @@
+---
+import { render } from 'astro:content';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { languages, type Language } from '../../../config/site';
+import { formatPostDate } from '../../../lib/git-dates';
+import { t } from '../../../lib/i18n';
+import { categoryLabel, getCategory, getPosts, type PostRecord } from '../../../lib/posts';
+import { localizedPath } from '../../../lib/urls';
+
+export async function getStaticPaths() {
+  const paths = [];
+  for (const lang of languages) {
+    const posts = await getPosts(lang);
+    for (const post of posts) {
+      paths.push({ params: { lang, slug: post.slug }, props: { post } });
+    }
+  }
+  return paths;
+}
+
+const lang = Astro.params.lang as Language;
+const { post } = Astro.props as { post: PostRecord };
+const text = t(lang);
+const { Content, headings } = await render(post.entry);
+const toc = headings.filter((heading) => (heading.depth === 2 || heading.depth === 3) && heading.slug !== 'footnote-label');
+const category = getCategory(post.entry.data.category);
+---
+
+<BaseLayout
+  lang={lang}
+  title={post.entry.data.title}
+  description={post.entry.data.summary}
+  noIndex={post.entry.data.draft}
+  article
+>
+  <article class="post-page">
+    <header class="post-hero">
+      <div class="container post-hero-inner">
+        <a class="back-link" href={localizedPath(lang)}><span aria-hidden="true">← </span>{text.backToPosts}</a>
+        {category && <ul class="category-tags" aria-label={text.categories}>
+          <li><a href={`${localizedPath(lang)}?category=${category.id}#posts`}>{categoryLabel(category, lang)}</a></li>
+        </ul>}
+        {post.entry.data.tags.length > 0 && <ul class="post-tags post-tags-large" aria-label={text.tags}>
+          {post.entry.data.tags.map((tag) => <li><a href={`${localizedPath(lang)}?tag=${encodeURIComponent(tag)}#posts`}>#{tag}</a></li>)}
+        </ul>}
+        {post.entry.data.draft && <p class="draft-notice" role="status">{text.draft} · Local preview only</p>}
+        <h1>{post.entry.data.title}</h1>
+        <p class="post-deck">{post.entry.data.summary}</p>
+        <dl class="post-dates post-dates-large">
+          <div>
+            <dt>{text.created}</dt>
+            <dd><time datetime={post.createdAt.toISOString()}>{formatPostDate(post.createdAt, lang)}</time></dd>
+          </div>
+          {post.updatedAt && <div>
+            <dt>{text.updated}</dt>
+            <dd><time datetime={post.updatedAt.toISOString()}>{formatPostDate(post.updatedAt, lang)}</time></dd>
+          </div>}
+        </dl>
+      </div>
+    </header>
+
+    <div class="container article-layout">
+      {toc.length > 0 && <aside class="toc-wrap">
+        <nav class="table-of-contents" aria-labelledby="toc-heading">
+          <h2 id="toc-heading">{text.tableOfContents}</h2>
+          <ol>
+            {toc.map((heading) => <li class:list={[`toc-depth-${heading.depth}`]}><a href={`#${heading.slug}`}>{heading.text}</a></li>)}
+          </ol>
+        </nav>
+      </aside>}
+      <div class="prose" data-prose data-lang={lang}>
+        <Content />
+      </div>
+    </div>
+  </article>
+</BaseLayout>
+
+<script>
+  import { renderMermaidBlocks } from '../../../scripts/mermaid';
+  const prose = document.querySelector<HTMLElement>('[data-prose]');
+  if (prose) void renderMermaidBlocks(prose, prose.dataset.lang === 'ko' ? 'ko' : 'en');
+</script>

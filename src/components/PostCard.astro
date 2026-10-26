@@ -1,0 +1,46 @@
+---
+import type { PostRecord } from '../lib/posts';
+import { categoryLabel, getCategory } from '../lib/posts';
+import type { Language } from '../config/site';
+import { formatPostDate } from '../lib/git-dates';
+import { t } from '../lib/i18n';
+import { localizedPath } from '../lib/urls';
+
+interface Props { post: PostRecord; lang: Language }
+const { post, lang } = Astro.props;
+const text = t(lang);
+const category = getCategory(post.entry.data.category);
+---
+
+<article
+  class="post-card"
+  data-post-card
+  data-slug={post.slug}
+  data-title={post.entry.data.title.normalize('NFKC').toLocaleLowerCase()}
+  data-created={post.createdDate}
+  data-category={post.entry.data.category}
+  data-tags={post.entry.data.tags.join(',')}
+>
+  <div class="post-card-topline">
+    {category && <ul class="category-tags" aria-label={text.categories}><li>{categoryLabel(category, lang)}</li></ul>}
+    {post.entry.data.draft && <span class="draft-badge">{text.draft}</span>}
+  </div>
+  <h3><a href={localizedPath(lang, `posts/${post.slug}/`)}>{post.entry.data.title}</a></h3>
+  <p class="post-summary">{post.entry.data.summary}</p>
+  {post.entry.data.tags.length > 0 && <ul class="post-tags" aria-label={text.tags}>
+    {post.entry.data.tags.map((tag) => <li>#{tag}</li>)}
+  </ul>}
+  <dl class="post-dates">
+    <div>
+      <dt>{text.created}</dt>
+      <dd><time datetime={post.createdAt.toISOString()}>{formatPostDate(post.createdAt, lang)}</time></dd>
+    </div>
+    {post.updatedAt && <div>
+      <dt>{text.updated}</dt>
+      <dd><time datetime={post.updatedAt.toISOString()}>{formatPostDate(post.updatedAt, lang)}</time></dd>
+    </div>}
+  </dl>
+  <a class="read-link" href={localizedPath(lang, `posts/${post.slug}/`)}>
+    {text.readPost}<span aria-hidden="true"> →</span>
+  </a>
+</article>

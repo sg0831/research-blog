@@ -1,0 +1,18 @@
+[
+  {
+    "id": "paper-reviews",
+    "ko": "논문 리뷰",
+    "en": "Paper Reviews",
+    "template": "paper-reviews",
+    "descriptionKo": "읽은 논문의 핵심 아이디어와 결과, 배운 점을 정리합니다.",
+    "descriptionEn": "Student notes on a paper's core idea, results, and lessons learned."
+  },
+  {
+    "id": "research-notes",
+    "ko": "연구노트",
+    "en": "Research Notes",
+    "template": "research-notes",
+    "descriptionKo": "연구 과정에서 발견한 질문과 아이디어를 기록합니다.",
+    "descriptionEn": "Questions, ideas, and lessons gathered throughout the research process."
+  }
+]

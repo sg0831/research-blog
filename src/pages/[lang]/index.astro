@@ -1,0 +1,140 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostCard from '../../components/PostCard.astro';
+import { languages, siteConfig, type Language } from '../../config/site';
+import { t } from '../../lib/i18n';
+import { categories, categoryLabel, getPosts, tags as availableTags } from '../../lib/posts';
+import { withBase } from '../../lib/urls';
+
+export function getStaticPaths() {
+  return languages.map((lang) => ({ params: { lang } }));
+}
+
+const lang = Astro.params.lang as Language;
+const text = t(lang);
+const posts = await getPosts(lang);
+const searchIndexUrl = withBase(`search-index/${lang}.json`);
+---
+
+<BaseLayout lang={lang}>
+  <section class="hero">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">{text.heroEyebrow}</p>
+        <h1>{siteConfig.title[lang]}</h1>
+        <p class="hero-description">{siteConfig.description[lang]}</p>
+        <a class="button primary" href="#posts">{text.latest}<span aria-hidden="true"> ↓</span></a>
+      </div>
+      <div class="hero-motif" aria-hidden="true">
+        <span class="motif-card motif-one"></span>
+        <span class="motif-card motif-two"></span>
+        <span class="motif-card motif-three"></span>
+        <span class="motif-line"></span>
+      </div>
+    </div>
+  </section>
+
+  <div
+    class="container post-browser"
+    data-post-browser
+    data-lang={lang}
+    data-search-index={searchIndexUrl}
+    data-tags={JSON.stringify(availableTags)}
+    data-per-page={siteConfig.postsPerPage}
+    data-result-singular={lang === 'ko' ? '검색 결과 {count}개' : '{count} search result'}
+    data-result-plural={lang === 'ko' ? '검색 결과 {count}개' : '{count} search results'}
+    data-page-template={lang === 'ko' ? '전체 {total}페이지 중 {page}페이지' : 'Page {page} of {total}'}
+  >
+    <aside class="category-rail" aria-labelledby="category-heading">
+      <div class="sticky-panel">
+        <p class="section-kicker">Browse</p>
+        <h2 id="category-heading">{text.categories}</h2>
+        <p>{text.browseIntro}</p>
+        <div class="category-shortcuts" role="group" aria-label={text.categories}>
+          <button type="button" class="category-shortcut is-active" data-category-shortcut="" aria-pressed="true">
+            <span>{text.allCategories}</span><span>{posts.length}</span>
+          </button>
+          {categories.map((category) => <button type="button" class="category-shortcut" data-category-shortcut={category.id} aria-pressed="false">
+            <span>{categoryLabel(category, lang)}</span>
+            <span>{posts.filter((post) => post.entry.data.category === category.id).length}</span>
+          </button>)}
+        </div>
+      </div>
+    </aside>
+
+    <section id="posts" class="posts-area" aria-labelledby="posts-heading">
+      <div class="section-heading-row">
+        <div>
+          <p class="section-kicker">Archive</p>
+          <h2 id="posts-heading">{text.latest}</h2>
+        </div>
+        <p class="result-status" role="status" aria-live="polite" tabindex="-1" data-result-status>{text.resultCount(posts.length)}</p>
+      </div>
+
+      <details class="search-panel" open>
+        <summary>{text.search}</summary>
+        <form data-search-form>
+          <div class="search-main-row">
+            <label class="field search-field">
+              <span>{text.searchQuery}</span>
+              <input type="search" name="query" autocomplete="off" placeholder={text.searchPlaceholder} />
+            </label>
+            <label class="field scope-field">
+              <span>{text.searchScope}</span>
+              <select name="scope">
+                <option value="title">{text.titleOnly}</option>
+                <option value="content">{text.contentOnly}</option>
+                <option value="both" selected>{text.titleAndContent}</option>
+              </select>
+            </label>
+          </div>
+          <div class="date-row">
+            <label class="field"><span>{text.fromDate}</span><input type="date" name="from" /></label>
+            <label class="field"><span>{text.toDate}</span><input type="date" name="to" /></label>
+          </div>
+          <label class="field category-filter-field">
+            <span>{text.filterCategories}</span>
+            <select name="category">
+              <option value="">{text.allCategoriesOption}</option>
+              {categories.map((category) => <option value={category.id}>{categoryLabel(category, lang)}</option>)}
+            </select>
+          </label>
+          <div class="tag-picker" data-tag-picker>
+            <label class="field" for="post-tag-search">
+              <span>{text.filterTags}</span>
+              <input
+                id="post-tag-search"
+                type="text"
+                role="combobox"
+                aria-autocomplete="list"
+                aria-expanded="false"
+                aria-controls="post-tag-suggestions"
+                aria-describedby="post-tag-help"
+                autocomplete="off"
+                placeholder={text.tagSearchPlaceholder}
+                data-tag-input
+              />
+            </label>
+            <p id="post-tag-help" class="field-help">{text.tagSearchHelp}</p>
+            <ul id="post-tag-suggestions" class="tag-suggestions" role="listbox" hidden data-tag-listbox></ul>
+            <ul class="selected-tag-list" aria-label={text.selectedTags} data-selected-tags></ul>
+            <p class="visually-hidden" role="status" aria-live="polite" data-tag-live></p>
+          </div>
+          <button type="reset" class="button quiet" data-reset>{text.reset}</button>
+        </form>
+      </details>
+
+      <div class="post-list" data-post-list>
+        {posts.map((post) => <PostCard post={post} lang={lang} />)}
+      </div>
+      <p class="empty-state" data-empty-state hidden={posts.length > 0}>{posts.length ? text.noResults : text.noPosts}</p>
+      <nav class="pagination" aria-label={lang === 'ko' ? '페이지 이동' : 'Pagination'} data-pagination hidden>
+        <button type="button" class="button quiet" data-previous>{text.previous}</button>
+        <span aria-live="polite" data-page-status></span>
+        <button type="button" class="button quiet" data-next>{text.next}</button>
+      </nav>
+    </section>
+  </div>
+</BaseLayout>
+
+<script src="../../scripts/post-browser.ts"></script>
